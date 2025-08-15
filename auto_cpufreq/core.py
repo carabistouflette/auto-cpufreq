@@ -455,9 +455,13 @@ def countdown(s):
     print("\n\t\tExecuted on:", getoutput('date'))
 
 # get cpu usage + system load for (last minute)
-def get_load():    
-    cpuload = psutil.cpu_percent(interval=1) # get CPU utilization as a percentage
+def _get_load_data(interval=1):
+    cpuload = psutil.cpu_percent(interval=interval) # get CPU utilization as a percentage
     load1m, _, _ = os.getloadavg() # get system/CPU load
+    return cpuload, load1m
+
+def get_load():    
+    cpuload, load1m = _get_load_data()
 
     print("\nTotal CPU usage:", cpuload, "%")
     print("Total system load: {:.2f}".format(load1m))
