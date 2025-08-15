@@ -18,6 +18,8 @@ from auto_cpufreq.globals import (
     ALL_GOVERNORS, AVAILABLE_GOVERNORS, AVAILABLE_GOVERNORS_SORTED, GITHUB, IS_INSTALLED_WITH_AUR, IS_INSTALLED_WITH_SNAP, POWER_SUPPLY_DIR, SNAP_DAEMON_CHECK
 )
 from auto_cpufreq.power_helper import *
+from auto_cpufreq.profiler import foreground_app, database
+import time
 
 filterwarnings("ignore")
 
@@ -56,6 +58,12 @@ else:
     auto_cpufreq_stats_path = Path("/var/run/auto-cpufreq.stats")
     governor_override_state = Path("/opt/auto-cpufreq/override.pickle")
     turbo_override_state    = Path("/opt/auto-cpufreq/turbo-override.pickle")
+
+# Profiler state
+current_process_name = None
+current_process_start_time = None
+current_process_total_runtime_ms = 0
+current_process_high_load_runtime_ms = 0
 
 def file_stats():
     global auto_cpufreq_stats_file
@@ -791,6 +799,41 @@ def set_autofreq():
     """
     set cpufreq governor based if device is charging
     """
+
+    # Profiler logic
+    global current_process_name, current_process_start_time, current_process_total_runtime_ms, current_process_high_load_runtime_ms
+
+    new_foreground_app = foreground_app.get_foreground_app()
+
+    if new_foreground_app != current_process_name:
+        # Foreground app changed, save data for the old one
+        if current_process_name is not None and current_process_start_time is not None:
+            elapsed_time = (time.time() - current_process_start_time) * 1000 # in ms
+            current_process_total_runtime_ms += elapsed_time
+
+            database.update_app_stats(
+                process_name=current_process_name,
+                total_runtime_ms=current_process_total_runtime_ms,
+                high_load_runtime_ms=current_process_high_load_runtime_ms
+            )
+
+        # Reset stats for the new app
+        current_process_name = new_foreground_app
+        current_process_start_time = time.time()
+        current_process_total_runtime_ms = 0
+        current_process_high_load_runtime_ms = 0
+
+    if current_process_name is not None and current_process_start_time is not None:
+        # Update runtime for the current app
+        elapsed_time = (time.time() - current_process_start_time) * 1000 # in ms
+        current_process_start_time = time.time() # reset start time for next interval
+        current_process_total_runtime_ms += elapsed_time
+
+        # Check for high load
+        cpuload, _ = _get_load_data(interval=0.1)
+        if cpuload > 50: # 50% threshold for high load, can be configured later
+            current_process_high_load_runtime_ms += elapsed_time
+
     print("\n" + "-" * 28 + " CPU frequency scaling " + "-" * 28 + "\n")
 
     # determine which governor should be used
