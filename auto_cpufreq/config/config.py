@@ -65,4 +65,22 @@ class _Config:
         try: self._config.read(self.path)
         except ParsingError as e: print(f"The following error occured while parsing the config file: \n{repr(e)}")
 
+    def write_learned_apps(self, learned_apps: list):
+        """
+        Writes the list of learned performance-hungry applications to the config file.
+        """
+        # Ensure the [learned_performance_apps] section exists
+        if not self._config.has_section("learned_performance_apps"):
+            self._config.add_section("learned_performance_apps")
+
+        # Set the new list of apps, joining them by a comma
+        self._config.set("learned_performance_apps", "apps", ",".join(learned_apps))
+        
+        # Write the changes to the file
+        try:
+            with open(self.path, 'w') as configfile:
+                self._config.write(configfile)
+        except IOError:
+            print(f"Error: Could not write to config file: {self.path}")
+
 config = _Config()
