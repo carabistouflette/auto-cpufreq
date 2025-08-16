@@ -834,6 +834,19 @@ def set_autofreq():
         if cpuload > 50: # 50% threshold for high load, can be configured later
             current_process_high_load_runtime_ms += elapsed_time
 
+    # Analyze the data and update the config file
+    from auto_cpufreq.profiler import analyzer
+    from auto_cpufreq.config import config as app_config # rename to avoid conflict
+
+    learned_apps = analyzer.get_learned_performance_apps()
+
+    # Get the current list from config to avoid unnecessary writes
+    current_learned_apps_str = app_config.get_config().get("learned_performance_apps", "apps", fallback="")
+    current_learned_apps = current_learned_apps_str.split(',') if current_learned_apps_str else []
+
+    if set(learned_apps) != set(current_learned_apps):
+        app_config.write_learned_apps(learned_apps)
+
     print("\n" + "-" * 28 + " CPU frequency scaling " + "-" * 28 + "\n")
 
     # determine which governor should be used
